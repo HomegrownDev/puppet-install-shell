@@ -73,18 +73,22 @@ report_bug() {
 }
 
 # Get command line arguments
-while getopts v:f:d:h opt
+while getopts v:f:d:s:r:h opt
 do
   case "$opt" in
     v)  version="$OPTARG";;
     f)  cmdline_filename="$OPTARG";;
     d)  cmdline_dl_dir="$OPTARG";;
+    s)  cmdline_startup="$OPTARG";;
+    r)  cmdline_running="$OPTARG";;
     h) echo >&2 \
       "install_puppet_agent.sh - A shell script to install Puppet Agent > 4.0.0, asumming no dependancies
       usage:
       -v   version         version to install, defaults to $latest_version
       -f   filename        filename for downloaded file, defaults to original name
-      -d   download_dir    filename for downloaded file, defaults to /tmp/(random-number)"
+      -d   download_dir    filename for downloaded file, defaults to /tmp/(random-number)
+      -s   startup         auto startup mode for puppet agent, defaults to true
+      -r   running         ensure the puppet agent is running, defaults to running"
       exit 0;;
     \?)   # unknown flag
       echo >&2 \
@@ -107,7 +111,7 @@ elif test -f "/etc/debian_version"; then
   platform_version=`cat /etc/debian_version`
 elif test -f "/etc/redhat-release"; then
   platform=`sed 's/^\(.\+\) release.*/\1/' /etc/redhat-release | tr '[A-Z]' '[a-z]'`
-  platform_version=`sed 's/^.\+ release \([.0-9]\+\).*/\1/' /etc/redhat-release`
+  platform_version=`sed 's/^.\+ release \([.0-9]\).*/\1/' /etc/redhat-release`
 
   #If /etc/redhat-release exists, we act like RHEL by default. Except for fedora
   if test "$platform" = "fedora"; then
@@ -117,7 +121,7 @@ elif test -f "/etc/redhat-release"; then
   fi
 elif test -f "/etc/system-release"; then
   platform=`sed 's/^\(.\+\) release.\+/\1/' /etc/system-release | tr '[A-Z]' '[a-z]'`
-  platform_version=`sed 's/^.\+ release \([.0-9]\+\).*/\1/' /etc/system-release | tr '[A-Z]' '[a-z]'`
+  platform_version=`sed 's/^.\+ release \([.0-9]\).*/\1/' /etc/system-release | tr '[A-Z]' '[a-z]'`
   # amazon is built off of fedora, so act like RHEL
   if test "$platform" = "amazon linux ami"; then
     platform="el"
@@ -584,3 +588,24 @@ esac
 if test "x$tmp_dir" != "x"; then
   rm -r "$tmp_dir"
 fi
+
+#Initialize Puppet Agent
+if test "x$(which puppet)" != "x"; then 
+  puppet_path="$(which puppet)" 
+else 
+  puppet_path="/opt/puppetlabs/bin/puppet"
+fi
+
+if test "x$cmdline_running" != "x"; then
+  puppet_status="$cmdline_running"
+else
+  puppet_status="running"
+fi
+
+if test "x$cmdline_startup" != "x"; then
+  puppet_startup="$cmdline_startup"
+else
+  puppet_startup="true"
+fi
+
+"${puppet_path}" resource service puppet ensure="${puppet_status}" enable="${puppet_startup}"
